@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Market Mandala - NEPSE Chart</title>
+  <title>Market Mandala - NEPSE Demo Chart</title>
   <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     body { margin: 0; font-family: Arial; }
@@ -34,7 +34,11 @@
 <body>
   <div class="logo">Market Mandala</div>
   <div id="controls">
-    <input type="text" placeholder="Search (demo)">
+    <select id="companySelect">
+      <option value="NABIL">NABIL Bank</option>
+      <option value="NRIC">Nepal Reinsurance</option>
+      <option value="NTC">Nepal Telecom</option>
+    </select>
     <select id="chartType">
       <option value="candlestick">Candlestick</option>
       <option value="line">Line</option>
@@ -47,7 +51,32 @@
     let dark = false;
     let chart, series, volumeSeries;
 
-    function drawChart(type = 'candlestick') {
+    const demoData = {
+      NABIL: generateData(100, 140),
+      NRIC: generateData(600, 700),
+      NTC: generateData(900, 1000)
+    };
+
+    function generateData(min, max) {
+      const now = Math.floor(Date.now() / 1000);
+      const data = [];
+      for (let i = 0; i < 30; i++) {
+        const t = now - (30 - i) * 86400;
+        const o = random(min, max);
+        const c = o + random(-10, 10);
+        const h = Math.max(o, c) + random(0, 10);
+        const l = Math.min(o, c) - random(0, 10);
+        const v = random(1000, 10000);
+        data.push({ time: t, open: o, high: h, low: l, close: c, volume: v });
+      }
+      return data;
+    }
+
+    function random(min, max) {
+      return Math.round(min + Math.random() * (max - min));
+    }
+
+    function drawChart(symbol = 'NABIL', type = 'candlestick') {
       const bg = dark ? '#1e1e1e' : '#ffffff';
       const fg = dark ? '#ffffff' : '#000000';
 
@@ -72,22 +101,11 @@
         color: '#26a69a'
       });
 
-      const now = Math.floor(Date.now() / 1000);
-      const data = [];
-      for (let i = 0; i < 30; i++) {
-        const t = now - (30 - i) * 86400;
-        const o = 100 + Math.random() * 20;
-        const c = o + (Math.random() - 0.5) * 10;
-        const h = Math.max(o, c) + Math.random() * 5;
-        const l = Math.min(o, c) - Math.random() * 5;
-        const v = Math.floor(Math.random() * 10000);
-        data.push({ time: t, open: o, high: h, low: l, close: c, volume: v });
-      }
-
-      const prices = data.map(d => ({
+      const prices = demoData[symbol].map(d => ({
         time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
       }));
-      const volumes = data.map(d => ({
+
+      const volumes = demoData[symbol].map(d => ({
         time: d.time, value: d.volume, color: d.close > d.open ? '#26a69a' : '#ef5350'
       }));
 
@@ -95,16 +113,28 @@
       volumeSeries.setData(volumes);
     }
 
-    document.getElementById('chartType').addEventListener('change', e => {
-      drawChart(e.target.value);
+    document.getElementById('chartType').addEventListener('change', () => {
+      const sym = document.getElementById('companySelect').value;
+      const type = document.getElementById('chartType').value;
+      drawChart(sym, type);
+    });
+
+    document.getElementById('companySelect').addEventListener('change', () => {
+      const sym = document.getElementById('companySelect').value;
+      const type = document.getElementById('chartType').value;
+      drawChart(sym, type);
     });
 
     document.getElementById('toggleTheme').addEventListener('click', () => {
       dark = !dark;
-      drawChart(document.getElementById('chartType').value);
+      drawChart(
+        document.getElementById('companySelect').value,
+        document.getElementById('chartType').value
+      );
       document.getElementById('toggleTheme').innerText = dark ? 'Light Mode' : 'Dark Mode';
     });
 
+    // Initial load
     drawChart();
   </script>
 </body>
