@@ -142,21 +142,91 @@
 
       series.setData(prices);
       volumeSeries.setData(volumes);
+
+      // Add Moving Average (MA)
+      addMovingAverage(series, demoData[symbol], 10); // 10-period MA
+      addMovingAverage(series, demoData[symbol], 50); // 50-period MA
+
+      // Add RSI
+      addRSI(series, demoData[symbol], 14); // 14-period RSI
     }
 
-    // Volume toggle event listener
+    function addMovingAverage(series, data, period) {
+      const maData = calculateMovingAverage(data, period);
+      const maSeries = chart.addLineSeries({
+        color: 'blue',
+        lineWidth: 2
+      });
+      maSeries.setData(maData);
+    }
+
+    function calculateMovingAverage(data, period) {
+      const maData = [];
+      for (let i = period - 1; i < data.length; i++) {
+        let sum = 0;
+        for (let j = 0; j < period; j++) {
+          sum += data[i - j].close;
+        }
+        maData.push({
+          time: data[i].time,
+          value: sum / period
+        });
+      }
+      return maData;
+    }
+
+    function addRSI(series, data, period) {
+      const rsiData = calculateRSI(data, period);
+      const rsiSeries = chart.addLineSeries({
+        color: 'orange',
+        lineWidth: 2
+      });
+      rsiSeries.setData(rsiData);
+    }
+
+    function calculateRSI(data, period) {
+      const rsiData = [];
+      let gain = 0, loss = 0;
+
+      for (let i = 1; i < period; i++) {
+        const change = data[i].close - data[i - 1].close;
+        if (change > 0) gain += change;
+        else loss -= change;
+      }
+
+      gain /= period;
+      loss /= period;
+
+      rsiData.push({
+        time: data[period - 1].time,
+        value: 100 - (100 / (1 + (gain / loss)))
+      });
+
+      for (let i = period; i < data.length; i++) {
+        const change = data[i].close - data[i - 1].close;
+        if (change > 0) gain = (gain * (period - 1) + change) / period;
+        else loss = (loss * (period - 1) - change) / period;
+
+        const rs = gain / loss;
+        rsiData.push({
+          time: data[i].time,
+          value: 100 - (100 / (1 + rs))
+        });
+      }
+
+      return rsiData;
+    }
+
     document.getElementById('toggleVolume').addEventListener('click', () => {
       volumeMinimized = !volumeMinimized;
 
-      // Adjust volume panel height based on toggle
       volumeSeries.applyOptions({
         scaleMargins: {
-          top: volumeMinimized ? 0.9 : 0.8,   // Reduce volume panel height when minimized
-          bottom: 0,  // bottom padding
+          top: volumeMinimized ? 0.9 : 0.8,
+          bottom: 0,
         },
       });
 
-      // Update button text based on state
       document.getElementById('toggleVolume').innerText = volumeMinimized ? 'Maximize Volume' : 'Minimize Volume';
     });
 
@@ -174,14 +244,12 @@
 
     document.getElementById('toggleTheme').addEventListener('click', () => {
       dark = !dark;
-      drawChart(
-        document.getElementById('companySelect').value,
-        document.getElementById('chartType').value
-      );
+      drawChart(document.getElementById('companySelect').value, document.getElementById('chartType').value);
       document.getElementById('toggleTheme').innerText = dark ? 'Light Mode' : 'Dark Mode';
     });
 
-    drawChart();
+    // Initial Chart Render
+    drawChart('NABIL', 'candlestick');
   </script>
 </body>
 
