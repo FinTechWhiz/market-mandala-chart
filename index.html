@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Market Mandala - NEPSE Chart</title>
+    <title>Market Mandala - Live NEPSE Chart</title>
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         body {
@@ -24,26 +24,40 @@
             padding: 20px;
         }
         #chart {
-            height: 500px;
+            height: 400px;
         }
         #volume {
+            height: 120px;
+        }
+        #rsi {
             height: 150px;
+        }
+        #macd {
+            height: 150px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
         }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>Market Mandala</h1>
-        <p>NEPSE Technical Analysis Chart</p>
+        <p>Live NEPSE Technical Analysis</p>
     </div>
 
     <div id="chart-container">
         <div id="chart"></div>
         <div id="volume"></div>
+        <div id="rsi"></div>
+        <div id="macd"></div>
     </div>
 
     <script>
-        // Create chart
+        // ======================
+        // 1. Chart Setup
+        // ======================
         const chart = LightweightCharts.createChart(document.getElementById('chart'), {
             layout: {
                 backgroundColor: '#FFFFFF',
@@ -54,45 +68,213 @@
                 horzLines: { color: '#f0f0f0' },
             },
             width: document.getElementById('chart-container').clientWidth,
-            height: 500,
+            height: 400,
+            timeScale: {
+                timeVisible: true,
+                secondsVisible: false,
+            },
         });
 
-        // Add candlestick series
-        const candleSeries = chart.addCandlestickSeries({
-            upColor: '#4CAF50',
-            downColor: '#F44336',
-            borderVisible: false,
-            wickUpColor: '#4CAF50',
-            wickDownColor: '#F44336',
-        });
+        // ======================
+        // 2. Data Fetching (Using NEPSE Proxy API)
+        // ======================
+        async function fetchNepseData() {
+            try {
+                // Note: Replace with actual NEPSE API endpoint if available
+                const response = await fetch('https://api.nepsesharehub.com/v1/historical?symbol=NEPSE&days=365');
+                const data = await response.json();
+                
+                // Transform data to Lightweight Charts format
+                return data.map(item => ({
+                    time: item.date, // Format: YYYY-MM-DD
+                    open: item.open,
+                    high: item.high,
+                    low: item.low,
+                    close: item.close,
+                    volume: item.volume,
+                }));
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                return [];
+            }
+        }
 
-        // Add volume series
-        const volumeSeries = chart.addHistogramSeries({
-            color: '#2196F3',
-            priceFormat: { type: 'volume' },
-            priceScaleId: '',
-        });
+        // ======================
+        // 3. Technical Indicators
+        // ======================
+        function calculateRSI(data, period = 14) {
+            let gains = 0;
+            let losses = 0;
+            
+            // Calculate first average gain/loss
+            for (let i = 1; i <= period; i++) {
+                const change = data[i].close - data[i-1].close;
+                if (change >= 0) gains += change;
+                else losses -= change;
+            }
+            
+            let avgGain = gains / period;
+            let avgLoss = losses / period;
+            const rsiData = [];
+            
+            // Calculate subsequent RSI values
+            for (let i = period + 1; i < data.length; i++) {
+                const change = data[i].close - data[i-1].close;
+                let currentGain = 0;
+                let currentLoss = 0;
+                
+                if (change >= 0) currentGain = change;
+                else currentLoss = -change;
+                
+                avgGain = (avgGain * (period - 1) + currentGain) / period;
+                avgLoss = (avgLoss * (period - 1) + currentLoss) / period;
+                
+                const rs = avgGain / avgLoss;
+                rsiData.push({
+                    time: data[i].time,
+                    value: 100 - (100 / (1 + rs))
+                });
+            }
+            
+            return rsiData;
+        }
 
-        // Sample data (replace with real NEPSE data)
-        const data = [
-            { time: '2023-01-01', open: 1800, high: 1850, low: 1780, close: 1825, volume: 1200000 },
-            { time: '2023-01-02', open: 1825, high: 1840, low: 1810, close: 1830, volume: 900000 },
-            // Add more data points...
-        ];
+        function calculateMACD(data) {
+            const ema12 = calculateEMA(data, 12);
+            const ema26 = calculateEMA(data, 26);
+            const macdLine = ema12.map((ema, i) => ema - ema26[i]);
+            const signalLine = calculateEMA(macdLine.map((val, i) => ({
+                time: data[i].time,
+                close: val
+            })), 9);
+            
+            return {
+                macdLine,
+                signalLine,
+                histogram: macdLine.map((val, i) => val - signalLine[i])
+            };
+        }
 
-        candleSeries.setData(data);
-        volumeSeries.setData(data.map(item => ({
-            time: item.time,
-            value: item.volume,
-            color: item.close >= item.open ? '#4CAF50' : '#F44336',
-        })));
+        function calculateEMA(data, period) {
+            const k = 2 / (period + 1);
+            let ema = data[0].close;
+            const result = [{ time: data[0].time, value: ema }];
+            
+            for (let i = 1; i < data.length; i++) {
+                ema = data[i].close * k + ema * (1 - k);
+                result.push({ time: data[i].time, value: ema });
+            }
+            
+            return result;
+        }
 
-        // Add moving average (example)
-        const lineSeries = chart.addLineSeries({ color: '#FF9800', lineWidth: 2 });
-        lineSeries.setData(data.map(item => ({
-            time: item.time,
-            value: (item.open + item.high + item.low + item.close) / 4,
-        })));
+        // ======================
+        // 4. Initialize Charts
+        // ======================
+        async function initChart() {
+            document.getElementById('chart-container').innerHTML = `
+                <div id="chart"></div>
+                <div id="volume"></div>
+                <div id="rsi"></div>
+                <div id="macd"></div>
+            `;
+            
+            const rawData = await fetchNepseData();
+            if (rawData.length === 0) {
+                document.getElementById('chart-container').innerHTML = `
+                    <div class="loading">Failed to load data. Please try again later.</div>
+                `;
+                return;
+            }
+            
+            // Main Price Chart
+            const candleSeries = chart.addCandlestickSeries({
+                upColor: '#4CAF50',
+                downColor: '#F44336',
+                borderVisible: false,
+                wickUpColor: '#4CAF50',
+                wickDownColor: '#F44336',
+            });
+            candleSeries.setData(rawData);
+            
+            // Volume Chart
+            const volumeSeries = chart.addHistogramSeries({
+                color: '#2196F3',
+                priceFormat: { type: 'volume' },
+                priceScaleId: '',
+            });
+            volumeSeries.setData(rawData.map(item => ({
+                time: item.time,
+                value: item.volume,
+                color: item.close >= item.open ? '#4CAF50' : '#F44336',
+            })));
+            
+            // RSI Chart
+            const rsiChart = LightweightCharts.createChart(document.getElementById('rsi'), {
+                width: document.getElementById('chart-container').clientWidth,
+                height: 150,
+                layout: { backgroundColor: '#FFFFFF' },
+                grid: { vertLines: { color: '#f0f0f0' } },
+                timeScale: {
+                    timeVisible: true,
+                    secondsVisible: false,
+                },
+            });
+            
+            const rsiSeries = rsiChart.addLineSeries({
+                color: '#7E57C2',
+                lineWidth: 2,
+            });
+            const rsiData = calculateRSI(rawData);
+            rsiSeries.setData(rsiData);
+            
+            // MACD Chart
+            const macdChart = LightweightCharts.createChart(document.getElementById('macd'), {
+                width: document.getElementById('chart-container').clientWidth,
+                height: 150,
+                layout: { backgroundColor: '#FFFFFF' },
+                grid: { vertLines: { color: '#f0f0f0' } },
+                timeScale: {
+                    timeVisible: true,
+                    secondsVisible: false,
+                },
+            });
+            
+            const macd = calculateMACD(rawData);
+            const macdLineSeries = macdChart.addLineSeries({
+                color: '#26A69A',
+                lineWidth: 1,
+            });
+            macdLineSeries.setData(macd.macdLine.map((val, i) => ({
+                time: rawData[i].time,
+                value: val
+            })));
+            
+            const signalLineSeries = macdChart.addLineSeries({
+                color: '#FF9800',
+                lineWidth: 1,
+            });
+            signalLineSeries.setData(macd.signalLine.map((val, i) => ({
+                time: rawData[i].time,
+                value: val
+            })));
+            
+            // Auto-refresh every 5 minutes
+            setInterval(async () => {
+                const newData = await fetchNepseData();
+                if (newData.length > 0) {
+                    candleSeries.setData(newData);
+                    volumeSeries.setData(newData.map(item => ({
+                        time: item.time,
+                        value: item.volume,
+                        color: item.close >= item.open ? '#4CAF50' : '#F44336',
+                    })));
+                }
+            }, 300000); // 300000ms = 5 minutes
+        }
+
+        // Start the chart
+        initChart();
 
         // Responsive design
         window.addEventListener('resize', () => {
