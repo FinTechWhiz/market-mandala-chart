@@ -3,13 +3,28 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Market Mandala - NEPSE Chart</title>
   <style>
     body {
       margin: 0;
-      background-color: #f3f4f6;
       font-family: Arial, sans-serif;
+      background-color: #f3f4f6;
+      color: #111827;
+    }
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
     }
     #tv_chart_container {
       width: 100vw;
@@ -26,65 +41,124 @@
       box-shadow: 0 0 5px rgba(0,0,0,0.1);
       font-weight: bold;
     }
+    select, input[type="text"], button {
+      padding: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
   </style>
-  <script type="text/javascript" src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
   <div class="logo">Market Mandala</div>
+  <div id="controls">
+    <input type="text" id="symbolInput" placeholder="Search symbol (demo only)" />
+    <select id="chartType">
+      <option value="candlestick">Candlestick</option>
+      <option value="line">Line</option>
+    </select>
+    <button id="toggleTheme">Dark Mode</button>
+  </div>
   <div id="tv_chart_container"></div>
 
   <script>
-    const chart = LightweightCharts.createChart(document.getElementById('tv_chart_container'), {
-      width: window.innerWidth,
-      height: window.innerHeight,
-      layout: {
-        backgroundColor: '#f3f4f6',
-        textColor: '#000',
-      },
-      grid: {
-        vertLines: {
-          color: '#e0e0e0',
-        },
-        horzLines: {
-          color: '#e0e0e0',
-        },
-      },
-      timeScale: {
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    });
+    let darkMode = false;
+    let chart = null;
+    let series = null;
+    let volumeSeries = null;
 
-    const candleSeries = chart.addCandlestickSeries();
+    function createChart(type = 'candlestick') {
+      const bgColor = darkMode ? '#1e1e1e' : '#f3f4f6';
+      const textColor = darkMode ? '#ffffff' : '#000000';
 
-    fetch('https://newweb.nepalstock.com/api/nots/nepse-data/today-price')
-      .then(res => res.json())
-      .then(data => {
-        const now = new Date();
-        const fakeData = data.slice(0, 20).map((item, i) => ({
-          time: Math.floor((now.getTime() / 1000) - (60 * 60 * 24 * (20 - i))),
-          open: item.openPrice || 100,
-          high: item.maxPrice || 110,
-          low: item.minPrice || 90,
-          close: item.closePrice || 105,
-        }));
-        candleSeries.setData(fakeData);
-      })
-      .catch(err => {
-        console.error('Error loading NEPSE data, using demo data.', err);
-        const demoData = [
-          { time: 1641013200, open: 100, high: 110, low: 90, close: 105 },
-          { time: 1641099600, open: 105, high: 115, low: 95, close: 100 },
-          { time: 1641186000, open: 100, high: 120, low: 99, close: 115 },
-          { time: 1641272400, open: 115, high: 125, low: 105, close: 120 },
-          { time: 1641358800, open: 120, high: 130, low: 110, close: 125 },
-        ];
-        candleSeries.setData(demoData);
+      document.getElementById('tv_chart_container').innerHTML = '';
+      chart = LightweightCharts.createChart(document.getElementById('tv_chart_container'), {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        layout: {
+          backgroundColor: bgColor,
+          textColor: textColor,
+        },
+        grid: {
+          vertLines: {
+            color: '#e0e0e0',
+          },
+          horzLines: {
+            color: '#e0e0e0',
+          },
+        },
+        timeScale: {
+          timeVisible: true,
+          secondsVisible: false,
+        },
       });
 
-    window.addEventListener('resize', () => {
-      chart.resize(window.innerWidth, window.innerHeight);
+      if (type === 'candlestick') {
+        series = chart.addCandlestickSeries();
+      } else {
+        series = chart.addLineSeries();
+      }
+
+      volumeSeries = chart.addHistogramSeries({
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+        scaleMargins: { top: 0.9, bottom: 0 },
+        color: '#26a69a',
+      });
+
+      fetch('https://newweb.nepalstock.com/api/nots/nepse-data/today-price')
+        .then(res => res.json())
+        .then(data => {
+          const now = new Date();
+          const fakeData = data.slice(0, 30).map((item, i) => {
+            const timestamp = Math.floor((now.getTime() / 1000) - (60 * 60 * 24 * (30 - i)));
+            return {
+              time: timestamp,
+              open: item.openPrice || 100,
+              high: item.maxPrice || 110,
+              low: item.minPrice || 90,
+              close: item.closePrice || 105,
+              volume: item.tradeQuantity || 1000
+            };
+          });
+
+          const priceData = fakeData.map(d => ({
+            time: d.time,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close
+          }));
+
+          const volumeData = fakeData.map(d => ({
+            time: d.time,
+            value: d.volume,
+            color: d.close > d.open ? '#26a69a' : '#ef5350'
+          }));
+
+          series.setData(priceData);
+          volumeSeries.setData(volumeData);
+        })
+        .catch(err => {
+          console.error('Error loading NEPSE data:', err);
+        });
+
+      window.addEventListener('resize', () => {
+        chart.resize(window.innerWidth, window.innerHeight);
+      });
+    }
+
+    document.getElementById('chartType').addEventListener('change', (e) => {
+      createChart(e.target.value);
     });
+
+    document.getElementById('toggleTheme').addEventListener('click', () => {
+      darkMode = !darkMode;
+      document.getElementById('toggleTheme').innerText = darkMode ? 'Light Mode' : 'Dark Mode';
+      createChart(document.getElementById('chartType').value);
+    });
+
+    createChart('candlestick');
   </script>
 </body>
 </html>
