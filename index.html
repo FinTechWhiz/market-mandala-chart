@@ -1,58 +1,40 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Market Mandala - NEPSE Chart</title>
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background-color: #f3f4f6;
-      color: #111827;
-    }
-    #controls {
+    body { margin: 0; font-family: Arial; }
+    #tv_chart_container { width: 100vw; height: 100vh; }
+    #controls, .logo {
       position: absolute;
       top: 10px;
-      right: 10px;
-      z-index: 1000;
       background: white;
       padding: 10px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      z-index: 10;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .logo { left: 10px; font-weight: bold; }
+    #controls {
+      right: 10px;
       display: flex;
       gap: 10px;
       align-items: center;
-      flex-wrap: wrap;
     }
-    #tv_chart_container {
-      width: 100vw;
-      height: 100vh;
-    }
-    .logo {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 1000;
-      background: white;
-      padding: 5px 10px;
-      border-radius: 8px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-      font-weight: bold;
-    }
-    select, input[type="text"], button {
+    input, select, button {
       padding: 5px;
-      border-radius: 5px;
       border: 1px solid #ccc;
+      border-radius: 5px;
     }
   </style>
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
   <div class="logo">Market Mandala</div>
   <div id="controls">
-    <input type="text" id="symbolInput" placeholder="Search symbol (demo only)" />
+    <input type="text" placeholder="Search (demo)">
     <select id="chartType">
       <option value="candlestick">Candlestick</option>
       <option value="line">Line</option>
@@ -62,35 +44,19 @@
   <div id="tv_chart_container"></div>
 
   <script>
-    let darkMode = false;
-    let chart = null;
-    let series = null;
-    let volumeSeries = null;
+    let dark = false;
+    let chart, series, volumeSeries;
 
-    function createChart(type = 'candlestick') {
-      const bgColor = darkMode ? '#1e1e1e' : '#f3f4f6';
-      const textColor = darkMode ? '#ffffff' : '#000000';
+    function drawChart(type = 'candlestick') {
+      const bg = dark ? '#1e1e1e' : '#ffffff';
+      const fg = dark ? '#ffffff' : '#000000';
 
       document.getElementById('tv_chart_container').innerHTML = '';
       chart = LightweightCharts.createChart(document.getElementById('tv_chart_container'), {
+        layout: { backgroundColor: bg, textColor: fg },
         width: window.innerWidth,
         height: window.innerHeight,
-        layout: {
-          backgroundColor: bgColor,
-          textColor: textColor,
-        },
-        grid: {
-          vertLines: {
-            color: '#e0e0e0',
-          },
-          horzLines: {
-            color: '#e0e0e0',
-          },
-        },
-        timeScale: {
-          timeVisible: true,
-          secondsVisible: false,
-        },
+        timeScale: { timeVisible: true },
       });
 
       if (type === 'candlestick') {
@@ -103,62 +69,43 @@
         priceFormat: { type: 'volume' },
         priceScaleId: '',
         scaleMargins: { top: 0.9, bottom: 0 },
-        color: '#26a69a',
+        color: '#26a69a'
       });
 
-      fetch('https://newweb.nepalstock.com/api/nots/nepse-data/today-price')
-        .then(res => res.json())
-        .then(data => {
-          const now = new Date();
-          const fakeData = data.slice(0, 30).map((item, i) => {
-            const timestamp = Math.floor((now.getTime() / 1000) - (60 * 60 * 24 * (30 - i)));
-            return {
-              time: timestamp,
-              open: item.openPrice || 100,
-              high: item.maxPrice || 110,
-              low: item.minPrice || 90,
-              close: item.closePrice || 105,
-              volume: item.tradeQuantity || 1000
-            };
-          });
+      const now = Math.floor(Date.now() / 1000);
+      const data = [];
+      for (let i = 0; i < 30; i++) {
+        const t = now - (30 - i) * 86400;
+        const o = 100 + Math.random() * 20;
+        const c = o + (Math.random() - 0.5) * 10;
+        const h = Math.max(o, c) + Math.random() * 5;
+        const l = Math.min(o, c) - Math.random() * 5;
+        const v = Math.floor(Math.random() * 10000);
+        data.push({ time: t, open: o, high: h, low: l, close: c, volume: v });
+      }
 
-          const priceData = fakeData.map(d => ({
-            time: d.time,
-            open: d.open,
-            high: d.high,
-            low: d.low,
-            close: d.close
-          }));
+      const prices = data.map(d => ({
+        time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
+      }));
+      const volumes = data.map(d => ({
+        time: d.time, value: d.volume, color: d.close > d.open ? '#26a69a' : '#ef5350'
+      }));
 
-          const volumeData = fakeData.map(d => ({
-            time: d.time,
-            value: d.volume,
-            color: d.close > d.open ? '#26a69a' : '#ef5350'
-          }));
-
-          series.setData(priceData);
-          volumeSeries.setData(volumeData);
-        })
-        .catch(err => {
-          console.error('Error loading NEPSE data:', err);
-        });
-
-      window.addEventListener('resize', () => {
-        chart.resize(window.innerWidth, window.innerHeight);
-      });
+      series.setData(prices);
+      volumeSeries.setData(volumes);
     }
 
-    document.getElementById('chartType').addEventListener('change', (e) => {
-      createChart(e.target.value);
+    document.getElementById('chartType').addEventListener('change', e => {
+      drawChart(e.target.value);
     });
 
     document.getElementById('toggleTheme').addEventListener('click', () => {
-      darkMode = !darkMode;
-      document.getElementById('toggleTheme').innerText = darkMode ? 'Light Mode' : 'Dark Mode';
-      createChart(document.getElementById('chartType').value);
+      dark = !dark;
+      drawChart(document.getElementById('chartType').value);
+      document.getElementById('toggleTheme').innerText = dark ? 'Light Mode' : 'Dark Mode';
     });
 
-    createChart('candlestick');
+    drawChart();
   </script>
 </body>
 </html>
