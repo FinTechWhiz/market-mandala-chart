@@ -1,0 +1,90 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Mandala - NEPSE Chart</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #f3f4f6;
+      font-family: Arial, sans-serif;
+    }
+    #tv_chart_container {
+      width: 100vw;
+      height: 100vh;
+    }
+    .logo {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 5px 10px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      font-weight: bold;
+    }
+  </style>
+  <script type="text/javascript" src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+  <div class="logo">Market Mandala</div>
+  <div id="tv_chart_container"></div>
+
+  <script>
+    const chart = LightweightCharts.createChart(document.getElementById('tv_chart_container'), {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      layout: {
+        backgroundColor: '#f3f4f6',
+        textColor: '#000',
+      },
+      grid: {
+        vertLines: {
+          color: '#e0e0e0',
+        },
+        horzLines: {
+          color: '#e0e0e0',
+        },
+      },
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    });
+
+    const candleSeries = chart.addCandlestickSeries();
+
+    fetch('https://newweb.nepalstock.com/api/nots/nepse-data/today-price')
+      .then(res => res.json())
+      .then(data => {
+        const now = new Date();
+        const fakeData = data.slice(0, 20).map((item, i) => ({
+          time: Math.floor((now.getTime() / 1000) - (60 * 60 * 24 * (20 - i))),
+          open: item.openPrice || 100,
+          high: item.maxPrice || 110,
+          low: item.minPrice || 90,
+          close: item.closePrice || 105,
+        }));
+        candleSeries.setData(fakeData);
+      })
+      .catch(err => {
+        console.error('Error loading NEPSE data, using demo data.', err);
+        const demoData = [
+          { time: 1641013200, open: 100, high: 110, low: 90, close: 105 },
+          { time: 1641099600, open: 105, high: 115, low: 95, close: 100 },
+          { time: 1641186000, open: 100, high: 120, low: 99, close: 115 },
+          { time: 1641272400, open: 115, high: 125, low: 105, close: 120 },
+          { time: 1641358800, open: 120, high: 130, low: 110, close: 125 },
+        ];
+        candleSeries.setData(demoData);
+      });
+
+    window.addEventListener('resize', () => {
+      chart.resize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
