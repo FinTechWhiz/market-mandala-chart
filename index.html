@@ -1,118 +1,103 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Market Mandala Chart</title>
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-    }
-
-    #controls {
-      padding: 10px;
-      background-color: #222;
-      color: white;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    #tv_chart_container {
-      height: 80vh;
-      width: 100%;
-      background-color: #f0f0f0;
-    }
-  </style>
+    <title>Market Mandala - NEPSE Chart</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #chart-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        #chart {
+            height: 500px;
+        }
+        #volume {
+            height: 150px;
+        }
+    </style>
 </head>
 <body>
-
-  <div id="controls">
-    <div>
-      <label for="companySelect">Company:</label>
-      <select id="companySelect">
-        <option value="NABIL">NABIL</option>
-        <option value="NRIC">NRIC</option>
-        <option value="NTC">NTC</option>
-      </select>
+    <div class="header">
+        <h1>Market Mandala</h1>
+        <p>NEPSE Technical Analysis Chart</p>
     </div>
-    <button id="toggleTheme">Toggle Dark Mode</button>
-  </div>
 
-  <div id="tv_chart_container"></div>
+    <div id="chart-container">
+        <div id="chart"></div>
+        <div id="volume"></div>
+    </div>
 
-  <script>
-    let chart, series;
-    let darkMode = false;
+    <script>
+        // Create chart
+        const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+            layout: {
+                backgroundColor: '#FFFFFF',
+                textColor: '#191919',
+            },
+            grid: {
+                vertLines: { color: '#f0f0f0' },
+                horzLines: { color: '#f0f0f0' },
+            },
+            width: document.getElementById('chart-container').clientWidth,
+            height: 500,
+        });
 
-    const demoData = {
-      NABIL: generateData(100, 140),
-      NRIC: generateData(600, 700),
-      NTC: generateData(900, 1000)
-    };
+        // Add candlestick series
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#4CAF50',
+            downColor: '#F44336',
+            borderVisible: false,
+            wickUpColor: '#4CAF50',
+            wickDownColor: '#F44336',
+        });
 
-    function generateData(min, max) {
-      const now = Math.floor(Date.now() / 1000);
-      const data = [];
-      for (let i = 0; i < 50; i++) {
-        const t = now - (50 - i) * 86400;
-        const o = random(min, max);
-        const c = o + random(-10, 10);
-        const h = Math.max(o, c) + random(0, 10);
-        const l = Math.min(o, c) - random(0, 10);
-        const v = random(1000, 10000);
-        data.push({ time: t, open: o, high: h, low: l, close: c, volume: v });
-      }
-      return data;
-    }
+        // Add volume series
+        const volumeSeries = chart.addHistogramSeries({
+            color: '#2196F3',
+            priceFormat: { type: 'volume' },
+            priceScaleId: '',
+        });
 
-    function random(min, max) {
-      return Math.round(min + Math.random() * (max - min));
-    }
+        // Sample data (replace with real NEPSE data)
+        const data = [
+            { time: '2023-01-01', open: 1800, high: 1850, low: 1780, close: 1825, volume: 1200000 },
+            { time: '2023-01-02', open: 1825, high: 1840, low: 1810, close: 1830, volume: 900000 },
+            // Add more data points...
+        ];
 
-    function drawChart(symbol = 'NABIL') {
-      const bg = darkMode ? '#1e1e1e' : '#ffffff';
-      const fg = darkMode ? '#ffffff' : '#000000';
+        candleSeries.setData(data);
+        volumeSeries.setData(data.map(item => ({
+            time: item.time,
+            value: item.volume,
+            color: item.close >= item.open ? '#4CAF50' : '#F44336',
+        })));
 
-      document.getElementById('tv_chart_container').innerHTML = '';
-      chart = LightweightCharts.createChart(document.getElementById('tv_chart_container'), {
-        layout: {
-          backgroundColor: bg,
-          textColor: fg
-        },
-        width: window.innerWidth,
-        height: window.innerHeight,
-        rightPriceScale: {
-          scaleMargins: {
-            top: 0.1,
-            bottom: 0.25
-          }
-        },
-        timeScale: {
-          timeVisible: true
-        }
-      });
+        // Add moving average (example)
+        const lineSeries = chart.addLineSeries({ color: '#FF9800', lineWidth: 2 });
+        lineSeries.setData(data.map(item => ({
+            time: item.time,
+            value: (item.open + item.high + item.low + item.close) / 4,
+        })));
 
-      series = chart.addCandlestickSeries();
-      const prices = demoData[symbol].map(d => ({
-        time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
-      }));
-      series.setData(prices);
-    }
-
-    document.getElementById('companySelect').addEventListener('change', (e) => {
-      drawChart(e.target.value);
-    });
-
-    document.getElementById('toggleTheme').addEventListener('click', () => {
-      darkMode = !darkMode;
-      drawChart(document.getElementById('companySelect').value);
-    });
-
-    drawChart('NABIL'); // Initial chart render
-  </script>
+        // Responsive design
+        window.addEventListener('resize', () => {
+            chart.applyOptions({ width: document.getElementById('chart-container').clientWidth });
+        });
+    </script>
 </body>
 </html>
