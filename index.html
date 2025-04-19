@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,24 +19,17 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
-    }
-
-    select,
-    button {
-      margin: 5px;
-      padding: 5px 10px;
-      font-size: 16px;
     }
 
     #tv_chart_container {
-      height: 90vh;
+      height: 80vh;
       width: 100%;
+      background-color: #f0f0f0;
     }
   </style>
 </head>
-
 <body>
+
   <div id="controls">
     <div>
       <label for="companySelect">Company:</label>
@@ -46,23 +38,15 @@
         <option value="NRIC">NRIC</option>
         <option value="NTC">NTC</option>
       </select>
-
-      <label for="chartType">Chart Type:</label>
-      <select id="chartType">
-        <option value="candlestick">Candlestick</option>
-        <option value="line">Line</option>
-      </select>
     </div>
-    <button id="toggleTheme">Dark Mode</button>
-    <button id="toggleVolume">Minimize Volume</button>
+    <button id="toggleTheme">Toggle Dark Mode</button>
   </div>
 
   <div id="tv_chart_container"></div>
 
   <script>
-    let dark = false;
-    let chart, series, volumeSeries;
-    let volumeMinimized = false;
+    let chart, series;
+    let darkMode = false;
 
     const demoData = {
       NABIL: generateData(100, 140),
@@ -89,168 +73,46 @@
       return Math.round(min + Math.random() * (max - min));
     }
 
-    function drawChart(symbol = 'NABIL', type = 'candlestick') {
-      const bg = dark ? '#1e1e1e' : '#ffffff';
-      const fg = dark ? '#ffffff' : '#000000';
+    function drawChart(symbol = 'NABIL') {
+      const bg = darkMode ? '#1e1e1e' : '#ffffff';
+      const fg = darkMode ? '#ffffff' : '#000000';
 
       document.getElementById('tv_chart_container').innerHTML = '';
       chart = LightweightCharts.createChart(document.getElementById('tv_chart_container'), {
-        layout: { backgroundColor: bg, textColor: fg },
+        layout: {
+          backgroundColor: bg,
+          textColor: fg
+        },
         width: window.innerWidth,
         height: window.innerHeight,
         rightPriceScale: {
           scaleMargins: {
             top: 0.1,
-            bottom: 0.25,
-          },
+            bottom: 0.25
+          }
         },
-        timeScale: { timeVisible: true },
-        grid: {
-          vertLines: { color: dark ? '#444' : '#eee' },
-          horzLines: { color: dark ? '#444' : '#eee' }
-        },
-        crosshair: { mode: 0 }
+        timeScale: {
+          timeVisible: true
+        }
       });
 
-      if (type === 'candlestick') {
-        series = chart.addCandlestickSeries();
-      } else {
-        series = chart.addLineSeries();
-      }
-
-      volumeSeries = chart.addHistogramSeries({
-        color: '#26a69a',
-        priceFormat: {
-          type: 'volume',
-        },
-        priceScaleId: 'volume',
-        scaleMargins: {
-          top: 0.8,
-          bottom: 0,
-        },
-      });
-
+      series = chart.addCandlestickSeries();
       const prices = demoData[symbol].map(d => ({
         time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
       }));
-
-      const volumes = demoData[symbol].map(d => ({
-        time: d.time,
-        value: d.volume,
-        color: d.close > d.open ? '#26a69a' : '#ef5350',
-      }));
-
       series.setData(prices);
-      volumeSeries.setData(volumes);
-
-      // Add Moving Average (MA)
-      addMovingAverage(series, demoData[symbol], 10); // 10-period MA
-      addMovingAverage(series, demoData[symbol], 50); // 50-period MA
-
-      // Add RSI
-      addRSI(series, demoData[symbol], 14); // 14-period RSI
     }
 
-    function addMovingAverage(series, data, period) {
-      const maData = calculateMovingAverage(data, period);
-      const maSeries = chart.addLineSeries({
-        color: 'blue',
-        lineWidth: 2
-      });
-      maSeries.setData(maData);
-    }
-
-    function calculateMovingAverage(data, period) {
-      const maData = [];
-      for (let i = period - 1; i < data.length; i++) {
-        let sum = 0;
-        for (let j = 0; j < period; j++) {
-          sum += data[i - j].close;
-        }
-        maData.push({
-          time: data[i].time,
-          value: sum / period
-        });
-      }
-      return maData;
-    }
-
-    function addRSI(series, data, period) {
-      const rsiData = calculateRSI(data, period);
-      const rsiSeries = chart.addLineSeries({
-        color: 'orange',
-        lineWidth: 2
-      });
-      rsiSeries.setData(rsiData);
-    }
-
-    function calculateRSI(data, period) {
-      const rsiData = [];
-      let gain = 0, loss = 0;
-
-      for (let i = 1; i < period; i++) {
-        const change = data[i].close - data[i - 1].close;
-        if (change > 0) gain += change;
-        else loss -= change;
-      }
-
-      gain /= period;
-      loss /= period;
-
-      rsiData.push({
-        time: data[period - 1].time,
-        value: 100 - (100 / (1 + (gain / loss)))
-      });
-
-      for (let i = period; i < data.length; i++) {
-        const change = data[i].close - data[i - 1].close;
-        if (change > 0) gain = (gain * (period - 1) + change) / period;
-        else loss = (loss * (period - 1) - change) / period;
-
-        const rs = gain / loss;
-        rsiData.push({
-          time: data[i].time,
-          value: 100 - (100 / (1 + rs))
-        });
-      }
-
-      return rsiData;
-    }
-
-    document.getElementById('toggleVolume').addEventListener('click', () => {
-      volumeMinimized = !volumeMinimized;
-
-      volumeSeries.applyOptions({
-        scaleMargins: {
-          top: volumeMinimized ? 0.9 : 0.8,
-          bottom: 0,
-        },
-      });
-
-      document.getElementById('toggleVolume').innerText = volumeMinimized ? 'Maximize Volume' : 'Minimize Volume';
-    });
-
-    document.getElementById('chartType').addEventListener('change', () => {
-      const sym = document.getElementById('companySelect').value;
-      const type = document.getElementById('chartType').value;
-      drawChart(sym, type);
-    });
-
-    document.getElementById('companySelect').addEventListener('change', () => {
-      const sym = document.getElementById('companySelect').value;
-      const type = document.getElementById('chartType').value;
-      drawChart(sym, type);
+    document.getElementById('companySelect').addEventListener('change', (e) => {
+      drawChart(e.target.value);
     });
 
     document.getElementById('toggleTheme').addEventListener('click', () => {
-      dark = !dark;
-      drawChart(document.getElementById('companySelect').value, document.getElementById('chartType').value);
-      document.getElementById('toggleTheme').innerText = dark ? 'Light Mode' : 'Dark Mode';
+      darkMode = !darkMode;
+      drawChart(document.getElementById('companySelect').value);
     });
 
-    // Initial Chart Render
-    drawChart('NABIL', 'candlestick');
+    drawChart('NABIL'); // Initial chart render
   </script>
 </body>
-
 </html>
