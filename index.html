@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Market Mandala - NEPSE Demo Chart</title>
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     body { margin: 0; font-family: Arial; }
     #tv_chart_container { width: 100vw; height: 100vh; }
@@ -86,6 +86,10 @@
         width: window.innerWidth,
         height: window.innerHeight,
         timeScale: { timeVisible: true },
+        grid: {
+          vertLines: { color: dark ? '#444' : '#eee' },
+          horzLines: { color: dark ? '#444' : '#eee' }
+        }
       });
 
       if (type === 'candlestick') {
@@ -98,7 +102,6 @@
         priceFormat: { type: 'volume' },
         priceScaleId: '',
         scaleMargins: { top: 0.9, bottom: 0 },
-        color: '#26a69a'
       });
 
       const prices = demoData[symbol].map(d => ({
